@@ -2,11 +2,12 @@
 import * as THREE from "/build/three.module.js";
 
 //Variables globales
-var container;
 var sceneWidth, sceneHeight;
 var scene;
 var renderer;
 var camera;
+var rendererSize;
+var sceneSize;
 
 //Valores del tablero
 var juegoBuscar;
@@ -16,12 +17,11 @@ var juegoPuntos;
 var juegoReiniciarBoton;
 var juegoSalirBoton;
 
-var roundTime;
+var tiempoRestane;
 var gameScore = 0;
 var currentRound = 0;
-var url = document.location.href;
-var dificultadJuego = url.split('?')[1];
-
+var url;
+var dificultadJuego;
 
 var tiempoRonda;
 var cantidadFiguras;
@@ -35,6 +35,7 @@ var colores;
 var coloresm;
 var estado;
 var buscar = {};
+var objetivoEstablecido = [];
 
 // Geometrias
 
@@ -44,13 +45,7 @@ var geometry2= {};
 var geometry3= {};
 var geometry4= {};
 
-var rendererSize;
-var sceneSize;
-
-
-
 var figuras = [];
-var objetivoEstablecido = [];
 
 init();
 
@@ -98,8 +93,8 @@ function createScene() {
     document.body.appendChild(renderer.domElement);
     document.addEventListener('click', posicionMouse);
     juegoReiniciarBoton.addEventListener('click', restartGame);
-    juegoSalirBoton.addEventListener('click', quitGame);
-    window.addEventListener('resize', onWindowResize, false);
+    juegoSalirBoton.addEventListener('click', cerrarJuego);
+    window.addEventListener('resize', cambiarTamanio, false);
 
     // Condiciones de juego
     dificultad(dificultadJuego);
@@ -112,16 +107,8 @@ function createScene() {
     objetivos();
     objetivo();       
 
-    tiempoRondaId = setInterval(roundTimer, 100);
+    tiempoRondaId = setInterval(contadorRonda, 100);
     for (var i = 0; i < cantidadFiguras; i++) scene.add(figuras[i].tipo);
-
-    //Canvas
-    /*container = document.getElementById('container');
-    container.appendChild(renderer.domElement);
-    container.addEventListener("click", posicionMouse);
-    juegoBotonReiniciar.addEventListener('click', restartGame);
-    juegoSalirBoton.addEventListener('click', quitGame);
-    */
 }
 
 // Dibuja en un loop, llamandose asi mismo
@@ -144,6 +131,9 @@ function getterHtml(){
     juegoPuntos = document.getElementById('juegoPuntos');
     juegoReiniciarBoton = document.getElementById('juegoBotonReiniciar');
     juegoSalirBoton = document.getElementById('juegoSalirBoton');
+
+    url = document.location.href;
+    dificultadJuego = url.split('?')[1];
 }
 
 function dificultad(multiplicador) {
@@ -155,7 +145,7 @@ function dificultad(multiplicador) {
     tiempoRonda = tiempoRonda / multiplicador;
     bonus = bonus * multiplicador;
 
-    tiempoRondaId = setInterval(roundTimer, 100);
+    tiempoRondaId = setInterval(contadorRonda, 100);
 }
 
 function atributosFiguras() {
@@ -176,11 +166,13 @@ function atributosFiguras() {
         'amarillo',//ffff66
         'naranja' //ff8000
     ];
+
     estado = [
         'quieto',
         'saltando',
         'volando'
     ];
+
     coloresm = [  
             0xff0000,
             0x00ff00,
@@ -193,23 +185,23 @@ function atributosFiguras() {
 
     // Geometrias
 
-    geometry0 = new THREE.CircleGeometry(50, 30);    
-    geometry1 = new THREE.BoxGeometry(80, 80, 80);    
+    geometry0 = new THREE.CircleGeometry(40, 20);    
+    geometry1 = new THREE.BoxGeometry(70, 70, 70);    
     geometry2 = new THREE.CircleGeometry(60, 3);
     geometry3 = new THREE.Geometry();    
     geometry4 = new THREE.Geometry();
 
-    geometry3.vertices.push(new THREE.Vector3(-50, -50, 0));
-    geometry3.vertices.push(new THREE.Vector3(-50, 50, 0));
-    geometry3.vertices.push(new THREE.Vector3(50, 50, 0));
-    geometry3.vertices.push(new THREE.Vector3(50, -50, 0));
+    geometry3.vertices.push(new THREE.Vector3(-45, -45, 0));
+    geometry3.vertices.push(new THREE.Vector3(-45, 45, 0));
+    geometry3.vertices.push(new THREE.Vector3(45, 45, 0));
+    geometry3.vertices.push(new THREE.Vector3(45, -45, 0));
     geometry3.faces.push(new THREE.Face3(0, 3, 2));
     geometry3.faces.push(new THREE.Face3(0, 2, 1));
 
-    geometry4.vertices.push(new THREE.Vector3(0, -70, 0));
-    geometry4.vertices.push(new THREE.Vector3(-40, 0, 0));
+    geometry4.vertices.push(new THREE.Vector3(0, -60, 0));
+    geometry4.vertices.push(new THREE.Vector3(-30, 0, 0));
     geometry4.vertices.push(new THREE.Vector3(0, 70, 0));
-    geometry4.vertices.push(new THREE.Vector3(40, 0, 0));
+    geometry4.vertices.push(new THREE.Vector3(30, 0, 0));
     geometry4.faces.push(new THREE.Face3(0, 3, 2));
     geometry4.faces.push(new THREE.Face3(0, 2, 1));
 }
@@ -285,12 +277,12 @@ function generarFiguras(figuras) {
                 figuras[i].y = coordenadaY;
                 break;
             case 1:
-                figuras[i].y = getRandomInt(coordenadaY, coordenadaY + 100);
+                figuras[i].y = Math.floor(Math.random() * (coordenadaY - coordenadaY+80 + 1)) + coordenadaY;                
                 figuras[i].velocidad = -1;
                 break;
             case 2:
                 figuras[i].y = coordenadaY + 100;
-                figuras[i].angle = getRandomFloat(0, Math.PI);
+                figuras[i].angle = Math.random() * (0 - Math.PI) + Math.PI;
                 break;
         }
         figuras[i].tipo.position.y = figuras[i].y;
@@ -304,65 +296,18 @@ function objetivo() {
         color: 0,
         forma: 0
     }
-    var currentFigure = objetivoEstablecido[currentRound].figureNumber; //getRandomInt(0, cantidadFiguras - 1);
+    var currentFigure = objetivoEstablecido[currentRound].figureNumber; 
     buscar.forma = figuras[currentFigure].forma;
     buscar.color = figuras[currentFigure].color;
     buscar.movimiento = figuras[currentFigure].movimiento;
 
-    roundTime = tiempoRonda;
+    tiempoRestane = tiempoRonda;
     juegoBuscar.innerHTML = 'Encuentra el ' +  formas[buscar.forma] + ' de color '  + colores[buscar.color]+ ' que está ' +  estado[buscar.movimiento];
-    var timerText = roundTime / 10;
+    var timerText = tiempoRestane / 10;
     juegoTiempo.innerHTML = 'Tiempo restante: ' + timerText.toFixed(1);
     juegoTiempo.style.color = '#00ff00';
     juegoRonda.innerHTML = 'Ronda: ' + (currentRound + 1) + '/5';
     juegoPuntos.innerHTML = 'Puntuación: ' + gameScore;
-}
-
-function posicionMouse(event) {
-    var sMouseX = ((event.pageX) / rendererSize.x - 0.5) * sceneSize.x;
-    var sMouseY = -((event.pageY - 100) / rendererSize.y - 0.5) * sceneSize.y;
-
-    for (var i = 0; i < cantidadFiguras; i++) {
-        if (sMouseX >= (figuras[i].x - 80) && sMouseX <= (figuras[i].x + 80) && sMouseY >= (figuras[i].y - 80) && sMouseY <= (figuras[i].y + 80)) {
-            if (buscar.forma == figuras[i].forma && buscar.color == figuras[i].color && buscar.movimiento == figuras[i].movimiento) {
-                timeScore += bonus * roundTime / tiempoRonda;
-                objetivoEstablecido[currentRound].complete = true;
-            }
-
-            if (currentRound < 4) {
-                currentRound++;
-                objetivo();
-            } else stopGame();
-        }
-
-    }
-}
-
-function rescaleTextInfo() {
-    juegoBuscar.style.width = window.innerWidth;
-    juegoBuscar.style.height = 50;
-    juegoBuscar.style.fontSize = 50 + 'px';
-    juegoBuscar.style.top = 125 + rendererSize.y + 'px';
-    juegoBuscar.style.left = 0 + 'px';
-
-    juegoTiempo.style.width = window.innerWidth;
-    juegoTiempo.style.height = 50;
-    juegoTiempo.style.fontSize = 50 + 'px';
-    juegoTiempo.style.top = 25 + 'px'; //800 + 'px';
-    juegoTiempo.style.left = 0 + 'px';
-
-    juegoRonda.style.width = window.innerWidth;
-    juegoRonda.style.height = 50;
-    juegoRonda.style.fontSize = 50 + 'px';
-    juegoRonda.style.top = 25 + 'px'; //800 + 'px';
-    juegoRonda.style.left = 0 + 'px';
-
-    juegoPuntos.style.width = window.innerWidth;
-    juegoPuntos.style.height = 50;
-    juegoPuntos.style.fontSize = 50 + 'px';
-    juegoPuntos.style.top = 25 + 'px'; //800 + 'px';
-    juegoPuntos.style.left = 0 + 'px';
-
 }
 
 function objetivos() {
@@ -375,12 +320,24 @@ function objetivos() {
     objetivoEstablecido=objetivoEstablecido.sort(function() {return Math.random() - 0.5});
 }
 
-function getRandomInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+function posicionMouse(event) {
+    var sMouseX = ((event.pageX) / rendererSize.x - 0.5) * sceneSize.x;
+    var sMouseY = -((event.pageY - 100) / rendererSize.y - 0.5) * sceneSize.y;
 
-function getRandomFloat(min, max) {
-    return Math.random() * (max - min) + min;
+    for (var i = 0; i < cantidadFiguras; i++) {
+        if (sMouseX >= (figuras[i].x - 80) && sMouseX <= (figuras[i].x + 80) && sMouseY >= (figuras[i].y - 80) && sMouseY <= (figuras[i].y + 80)) {
+            if (buscar.forma == figuras[i].forma && buscar.color == figuras[i].color && buscar.movimiento == figuras[i].movimiento) {
+                timeScore += bonus * tiempoRestane / tiempoRonda;
+                objetivoEstablecido[currentRound].complete = true;
+            }
+
+            if (currentRound < 4) {
+                currentRound++;
+                objetivo();
+            } else detenerJuego();
+        }
+
+    }
 }
 
 function processFigures(figuras) {
@@ -446,25 +403,25 @@ function restartGame() {
 
 }
 
-function quitGame() {
+function cerrarJuego() {
     window.location = "/index.html";
 }
 
-function roundTimer() {
-    roundTime -= 1;
-    var timerText = roundTime / 10;
+function contadorRonda() {
+    tiempoRestane -= 1;
+    var timerText = tiempoRestane / 10;
     juegoTiempo.innerHTML = 'Tiempo restante: ' + timerText.toFixed(1);
-    if (roundTime <= 30) juegoTiempo.style.color = '#ff0000';
-    else if (roundTime <= 60) juegoTiempo.style.color = '#ffff00';
-    if (roundTime <= 0) {
+    if (tiempoRestane <= 30) juegoTiempo.style.color = '#ff0000';
+    else if (tiempoRestane <= 60) juegoTiempo.style.color = '#ffff00';
+    if (tiempoRestane <= 0) {
         objetivo();
         currentRound++;
         if (currentRound <= 4) objetivo();
-        else stopGame();
+        else detenerJuego();
     }
 }
 
-function stopGame() {
+function detenerJuego() {
     clearInterval(tiempoRondaId);
     document.removeEventListener('click', posicionMouse);
     var temp;
@@ -475,20 +432,24 @@ function stopGame() {
     juegoSalirBoton.style.visibility = 'visible';
 
     for (var i = 0; i < cantidadFiguras; i++) {
-        temp = false;
-        for (var j = 0; j < 5; j++)
-            if (objetivoEstablecido[j].figureNumber == i) temp = true;
-        if (!temp) scene.remove(figuras[i].tipo);
-
+        scene.remove(figuras[i].tipo);
     }
 
-    for (var i = 0; i < 5; i++)
+    for (var i = 0; i < 5; i++){
         if (objetivoEstablecido[i].complete) {
             gameScore += bonus;
         }
+    }
 
     timeScore = Math.floor(timeScore / 10) * 10;
     gameScore += timeScore;
     juegoPuntos.innerHTML = 'Puntuación: ' + gameScore;
 
+}
+
+function cambiarTamanio() {
+    renderer.setPixelRatio(window.devicePixelRatio);
+    rendererSize.x = window.innerWidth;
+    rendererSize.y = window.innerWidth / sceneSize.ratio;
+    renderer.setSize(rendererSize.x, rendererSize.y);
 }
